@@ -15,6 +15,9 @@
 #include <ctime>
 #include <algorithm>
 #include <functional>
+#include <sys/socket.h>
+
+#define MSG_CONFIRM 0
 
 class UdpManager {
     public:
@@ -28,46 +31,52 @@ class UdpManager {
 
         void start() {
 
-            int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-            if (sock < 0) {
-                throw std::runtime_error("Error: Failed to create socket for UDP server");
+            int sockfd;
+            struct sockaddr_in servaddr, cliaddr;
+
+            // Creating socket file descriptor
+            if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+                perror("socket creation failed");
+                exit(EXIT_FAILURE);
             }
 
-            sockaddr_in server_address{};
-            server_address.sin_family = AF_INET;
-            server_address.sin_addr.s_addr = (_host == "localhost") ? INADDR_ANY : inet_addr(_host.c_str());
-            server_address.sin_port = htons(_port);
+            memset(&servaddr, 0, sizeof(servaddr));
+            memset(&cliaddr, 0, sizeof(cliaddr));
 
-            if (bind(sock, reinterpret_cast<sockaddr *>(&server_address), sizeof(server_address)) < 0) {
-                close(sock);
-                throw std::runtime_error("Error: Failed to bind socket for UDP server, port already in use");
+            // Filling server information
+            servaddr.sin_family    = AF_INET; // IPv4
+            servaddr.sin_addr.s_addr = INADDR_ANY;
+            servaddr.sin_port = htons(_port);
+
+            // Bind the socket with the server address
+            if ( bind(sockfd, (const struct sockaddr *)&servaddr,
+                      sizeof(servaddr)) < 0 )
+            {
+                perror("bind failed");
+                exit(EXIT_FAILURE);
             }
 
-            std::cout << "UDP server started on port " << _port << std::endl;
-
-            std::thread t([this, &sock] { startReceive(sock); });
+            std::thread t([this, &cliaddr, &sockfd] { startReceive(cliaddr, sockfd); });
             t.detach();
         }
 
     private:
-        void startReceive(const int &socket) {
+        void startReceive(sockaddr_in cliaddr, const int &sockfd) {
             std::cout << "Start receiving UDP packets" << std::endl;
             while (true) {
-                sockaddr_in client_address{};
-                socklen_t client_address_size = sizeof(client_address);
+                socklen_t len;
+                int n;
 
-                std::vector<std::byte> buffer(1024);
-                int result = recvfrom(socket, reinterpret_cast<char*>(buffer.data()), buffer.size(), 0, reinterpret_cast<sockaddr*>(&client_address), &client_address_size);
-                if (result == -1) {
-                    // handle error
-                    continue;
-                }
+                len = sizeof(cliaddr);  //len is value/result
 
-                std::cout << "Received event from UDP " << inet_ntoa(client_address.sin_addr) << ":" << ntohs(client_address.sin_port) << ": ";
-                for (int i = 0; i < result; i++) {
-                    std::cout << std::hex << static_cast<int>(buffer[i]) << " ";
-                }
-
+                const char *hello = "Hello from server";
+                char buffer[BUFFER_SIZE];
+                n = recvfrom(sockfd, (char *)buffer, BUFFER_SIZE, MSG_WAITALL, ( struct sockaddr *) &cliaddr, &len);
+                buffer[n] = '\0';
+                printf("Client : %s\n", buffer);
+                sendto(sockfd, (const char *)hello, strlen(hello), MSG_CONFIRM, (const struct sockaddr *) &cliaddr,
+                       len);
+                std::cout<<"Hello message sent."<<std::endl;
             }
         }
 
