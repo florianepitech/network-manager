@@ -4,9 +4,8 @@
 
 #pragma once
 
-#define BUFFER_SIZE 4096
-
 #include <string>
+#include "./NetworkUtils.hpp"
 #include "./uuid.hpp"
 #include "./TcpManager.hpp"
 #include "./UdpManager.hpp"
@@ -19,6 +18,7 @@ class NewNetworkManager {
         {
 
         };
+
         ~NewNetworkManager() = default;
 
         void start() {

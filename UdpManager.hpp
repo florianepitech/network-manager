@@ -17,8 +17,6 @@
 #include <functional>
 #include <sys/socket.h>
 
-#define MSG_CONFIRM 0
-
 class UdpManager {
     public:
         UdpManager(std::string host,
@@ -83,7 +81,6 @@ class UdpManager {
         template<typename EventType>
         void send(unsigned int eventId, const EventType &event) {
             std::vector<std::byte> dataBytes = _eventRegistry.serializeData(event);
-
         }
 
     private:
